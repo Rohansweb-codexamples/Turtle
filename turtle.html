@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turtle Blocks- Baby Turtle Graphics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f0fdf4;
+            overflow: hidden;
+        }
+
+        .scratch-font {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        .block {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .block:active {
+            cursor: grabbing;
+            transform: scale(1.02);
+        }
+
+        .workspace-block {
+            position: relative;
+            margin-bottom: 4px;
+            width: fit-content;
+        }
+
+        .turtle-canvas {
+            background-image: 
+                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .droppable-area {
+            min-height: 400px;
+        }
+
+        .turtle-sprite {
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-green-600 text-white p-4 flex justify-between items-center shadow-lg z-10">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🐢</span>
+            <h1 class="text-2xl scratch-font tracking-wider">TURTLE BLOCKS</h1>
+        </div>
+        <div class="flex gap-4">
+            <button id="run-btn" onclick="runCode()" class="bg-yellow-400 hover:bg-yellow-300 text-green-900 px-8 py-2 rounded-full font-bold flex items-center gap-2 shadow-md transition-all">
+                <span>▶</span> RUN
+            </button>
+            <button onclick="resetCanvas()" class="bg-red-500 hover:bg-red-400 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-md transition-all">
+                <span>↺</span> RESET
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Palette (Left) -->
+        <aside class="w-80 bg-white border-r border-green-200 overflow-y-auto p-4 flex flex-col gap-2">
+            <h2 class="font-bold text-green-800 text-sm uppercase tracking-widest mb-4">Block Palette</h2>
+            
+            <div id="palette" class="space-y-6">
+                <!-- Motion -->
+                <div>
+                    <p class="text-[10px] font-bold text-blue-500 mb-2 border-b border-blue-100 pb-1">MOTION</p>
+                    <div class="block bg-blue-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="forward">
+                        Move <input type="number" value="50" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()"> steps
+                    </div>
+                    <div class="block bg-blue-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="right">
+                        Turn ↻ <input type="number" value="90" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()"> deg
+                    </div>
+                    <div class="block bg-blue-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="left">
+                        Turn ↺ <input type="number" value="90" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()"> deg
+                    </div>
+                    <div class="block bg-blue-400 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="goto">
+                        Go to X: <input type="number" value="0" class="w-10 text-black px-1 rounded text-center" onclick="event.stopPropagation()"> Y: <input type="number" value="0" class="w-10 text-black px-1 rounded text-center" onclick="event.stopPropagation()">
+                    </div>
+                    <div class="block bg-blue-400 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="home">
+                        Go to Center
+                    </div>
+                </div>
+
+                <!-- Pen -->
+                <div>
+                    <p class="text-[10px] font-bold text-teal-600 mb-2 border-b border-teal-100 pb-1">PEN</p>
+                    <div class="block bg-teal-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="pendown">
+                        Pen Down
+                    </div>
+                    <div class="block bg-teal-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="penup">
+                        Pen Up
+                    </div>
+                    <div class="block bg-teal-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="color">
+                        Set Color <input type="color" value="#10b981" class="w-6 h-5 rounded cursor-pointer ml-1" onclick="event.stopPropagation()">
+                    </div>
+                    <div class="block bg-teal-600 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="width">
+                        Set Width <input type="number" value="3" min="1" max="50" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()">
+                    </div>
+                </div>
+
+                <!-- Looks -->
+                <div>
+                    <p class="text-[10px] font-bold text-purple-500 mb-2 border-b border-purple-100 pb-1">LOOKS & STAGE</p>
+                    <div class="block bg-purple-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="show">
+                        Show Turtle
+                    </div>
+                    <div class="block bg-purple-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="hide">
+                        Hide Turtle
+                    </div>
+                    <div class="block bg-purple-600 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="bgcolor">
+                        Stage Color <input type="color" value="#ffffff" class="w-6 h-5 rounded cursor-pointer ml-1" onclick="event.stopPropagation()">
+                    </div>
+                    <div class="block bg-purple-400 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="stamp">
+                        Stamp Turtle 🐢
+                    </div>
+                </div>
+
+                <!-- Control -->
+                <div>
+                    <p class="text-[10px] font-bold text-orange-500 mb-2 border-b border-orange-100 pb-1">CONTROL</p>
+                    <div class="block bg-orange-500 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="repeat">
+                        Repeat <input type="number" value="4" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()"> times
+                    </div>
+                    <div class="block bg-orange-400 text-white p-2.5 rounded-lg text-sm mb-2" draggable="true" data-type="wait">
+                        Wait <input type="number" value="0.5" step="0.1" class="w-10 text-black px-1 rounded mx-1 text-center" onclick="event.stopPropagation()"> secs
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Workspace (Center) -->
+        <section class="flex-1 bg-slate-100 p-6 overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-slate-400 text-sm uppercase tracking-widest">Workspace</h2>
+                <button onclick="clearWorkspace()" class="text-xs text-slate-400 hover:text-red-500 underline">Clear All</button>
+            </div>
+            <div id="workspace" class="droppable-area bg-white rounded-2xl border-2 border-dashed border-slate-300 p-6 min-h-[calc(100vh-200px)] shadow-inner">
+                <!-- Dropped blocks go here -->
+            </div>
+        </section>
+
+        <!-- Stage (Right) -->
+        <section class="w-[520px] bg-white border-l border-green-200 p-6 flex flex-col items-center">
+            <div class="flex justify-between w-full mb-4">
+                <h2 class="font-bold text-green-800 text-sm uppercase tracking-widest">Stage</h2>
+                <div class="flex gap-2">
+                    <div class="bg-slate-100 px-2 py-1 rounded text-[10px] text-slate-500">480 x 480</div>
+                </div>
+            </div>
+            
+            <div class="relative w-full aspect-square bg-white border-4 border-slate-800 rounded shadow-2xl overflow-hidden turtle-canvas" id="canvas-container">
+                <canvas id="turtle-canvas" class="absolute inset-0"></canvas>
+                
+                <!-- Baby Turtle Sprite -->
+                <div id="turtle-sprite" class="absolute w-12 h-12 flex items-center justify-center text-4xl select-none z-20 pointer-events-none" style="transform: translate(220px, 220px) rotate(0deg);">
+                    🐢
+                </div>
+            </div>
+
+            <!-- Stats Dashboard -->
+            <div class="mt-6 grid grid-cols-2 gap-3 w-full text-xs">
+                <div class="bg-green-50 p-2.5 rounded-lg border border-green-100 flex justify-between">
+                    <span class="text-green-600 font-bold uppercase tracking-tighter">X Position</span>
+                    <span id="stat-x" class="font-mono">0</span>
+                </div>
+                <div class="bg-green-50 p-2.5 rounded-lg border border-green-100 flex justify-between">
+                    <span class="text-green-600 font-bold uppercase tracking-tighter">Y Position</span>
+                    <span id="stat-y" class="font-mono">0</span>
+                </div>
+                <div class="bg-green-50 p-2.5 rounded-lg border border-green-100 flex justify-between">
+                    <span class="text-green-600 font-bold uppercase tracking-tighter">Heading</span>
+                    <span id="stat-angle" class="font-mono">0°</span>
+                </div>
+                <div class="bg-green-50 p-2.5 rounded-lg border border-green-100 flex justify-between">
+                    <span class="text-green-600 font-bold uppercase tracking-tighter">Pen State</span>
+                    <span id="stat-pen" class="font-mono">Down</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const canvas = document.getElementById('turtle-canvas');
+        const ctx = canvas.getContext('2d');
+        const sprite = document.getElementById('turtle-sprite');
+        const workspace = document.getElementById('workspace');
+        const container = document.getElementById('canvas-container');
+        const runBtn = document.getElementById('run-btn');
+
+        // State
+        let turtle = {
+            x: 0,
+            y: 0,
+            angle: -90, 
+            penDown: true,
+            color: '#10b981',
+            width: 3,
+            visible: true
+        };
+
+        let isRunning = false;
+
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            resetCanvas();
+        }
+
+        function resetCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            container.style.backgroundColor = 'white';
+            turtle.x = canvas.width / 2;
+            turtle.y = canvas.height / 2;
+            turtle.angle = -90;
+            turtle.penDown = true;
+            turtle.color = '#10b981';
+            turtle.width = 3;
+            turtle.visible = true;
+            updateSprite();
+        }
+
+        function clearWorkspace() {
+            if(confirm("Clear all blocks in workspace?")) {
+                workspace.innerHTML = '';
+            }
+        }
+
+        function updateSprite() {
+            sprite.style.transform = `translate(${turtle.x - 24}px, ${turtle.y - 24}px) rotate(${turtle.angle + 90}deg)`;
+            sprite.style.opacity = turtle.visible ? '1' : '0';
+            
+            document.getElementById('stat-x').innerText = Math.round(turtle.x - canvas.width/2);
+            document.getElementById('stat-y').innerText = Math.round(canvas.height/2 - turtle.y);
+            document.getElementById('stat-angle').innerText = `${Math.round(turtle.angle + 90)}°`;
+            document.getElementById('stat-pen').innerText = turtle.penDown ? 'Down' : 'Up';
+        }
+
+        // Drag and Drop Logic
+        let draggedElement = null;
+
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('block')) {
+                draggedElement = e.target;
+                e.dataTransfer.setData('text/plain', '');
+            }
+        });
+
+        workspace.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            workspace.classList.add('bg-blue-50', 'border-blue-400');
+        });
+
+        workspace.addEventListener('dragleave', () => {
+            workspace.classList.remove('bg-blue-50', 'border-blue-400');
+        });
+
+        workspace.addEventListener('drop', (e) => {
+            e.preventDefault();
+            workspace.classList.remove('bg-blue-50', 'border-blue-400');
+            
+            if (draggedElement) {
+                const isFromPalette = draggedElement.parentElement.id !== 'workspace';
+                let block;
+                
+                if (isFromPalette) {
+                    block = draggedElement.cloneNode(true);
+                    const delBtn = document.createElement('button');
+                    delBtn.innerHTML = '×';
+                    delBtn.className = 'ml-4 bg-black/10 hover:bg-red-500 hover:text-white w-5 h-5 rounded-full flex items-center justify-center text-xs transition-colors';
+                    delBtn.onclick = () => block.remove();
+                    block.appendChild(delBtn);
+                } else {
+                    block = draggedElement;
+                }
+
+                block.classList.add('workspace-block');
+                workspace.appendChild(block);
+            }
+        });
+
+        // Execution Engine
+        async function runCode() {
+            if (isRunning) return;
+            isRunning = true;
+            runBtn.disabled = true;
+            runBtn.classList.replace('bg-yellow-400', 'bg-gray-400');
+            
+            resetCanvas();
+            const blocks = Array.from(workspace.children);
+            
+            for (let block of blocks) {
+                await executeBlock(block);
+            }
+
+            isRunning = false;
+            runBtn.disabled = false;
+            runBtn.classList.replace('bg-gray-400', 'bg-yellow-400');
+        }
+
+        async function executeBlock(block) {
+            const type = block.dataset.type;
+            const inputs = Array.from(block.querySelectorAll('input'));
+            
+            // Visual feedback
+            block.classList.add('ring-2', 'ring-yellow-400', 'z-10');
+            
+            switch (type) {
+                case 'forward':
+                    await moveForward(parseFloat(inputs[0].value));
+                    break;
+                case 'right':
+                    turtle.angle += parseFloat(inputs[0].value);
+                    break;
+                case 'left':
+                    turtle.angle -= parseFloat(inputs[0].value);
+                    break;
+                case 'goto':
+                    const targetX = canvas.width/2 + parseFloat(inputs[0].value);
+                    const targetY = canvas.height/2 - parseFloat(inputs[1].value);
+                    if (turtle.penDown) {
+                        ctx.beginPath();
+                        ctx.moveTo(turtle.x, turtle.y);
+                        ctx.lineTo(targetX, targetY);
+                        ctx.strokeStyle = turtle.color;
+                        ctx.lineWidth = turtle.width;
+                        ctx.stroke();
+                    }
+                    turtle.x = targetX;
+                    turtle.y = targetY;
+                    break;
+                case 'home':
+                    turtle.x = canvas.width / 2;
+                    turtle.y = canvas.height / 2;
+                    turtle.angle = -90;
+                    break;
+                case 'pendown':
+                    turtle.penDown = true;
+                    break;
+                case 'penup':
+                    turtle.penDown = false;
+                    break;
+                case 'color':
+                    turtle.color = inputs[0].value;
+                    break;
+                case 'width':
+                    turtle.width = parseFloat(inputs[0].value);
+                    break;
+                case 'show':
+                    turtle.visible = true;
+                    break;
+                case 'hide':
+                    turtle.visible = false;
+                    break;
+                case 'bgcolor':
+                    container.style.backgroundColor = inputs[0].value;
+                    break;
+                case 'stamp':
+                    ctx.save();
+                    ctx.translate(turtle.x, turtle.y);
+                    ctx.rotate((turtle.angle + 90) * Math.PI / 180);
+                    ctx.font = '32px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('🐢', 0, 0);
+                    ctx.restore();
+                    break;
+                case 'wait':
+                    await new Promise(r => setTimeout(r, parseFloat(inputs[0].value) * 1000));
+                    break;
+                case 'repeat':
+                    const repeatCount = parseInt(inputs[0].value);
+                    const blocksToRepeat = [];
+                    let sibling = block.nextElementSibling;
+                    
+                    // Simple logic: repeat the rest of the workspace (like a simplified loop)
+                    // In a real Scratch clone, this would wrap blocks inside a container.
+                    // For this flat UI, we repeat all blocks below it.
+                    while (sibling) {
+                        blocksToRepeat.push(sibling);
+                        sibling = sibling.nextElementSibling;
+                    }
+                    
+                    for(let i = 0; i < repeatCount - 1; i++) {
+                        for(let subBlock of blocksToRepeat) {
+                            await executeBlock(subBlock);
+                        }
+                    }
+                    break;
+            }
+
+            updateSprite();
+            await new Promise(r => setTimeout(r, 50)); 
+            block.classList.remove('ring-2', 'ring-yellow-400', 'z-10');
+        }
+
+        function moveForward(distance) {
+            return new Promise(resolve => {
+                const rad = (turtle.angle * Math.PI) / 180;
+                const newX = turtle.x + Math.cos(rad) * distance;
+                const newY = turtle.y + Math.sin(rad) * distance;
+
+                if (turtle.penDown) {
+                    ctx.beginPath();
+                    ctx.moveTo(turtle.x, turtle.y);
+                    ctx.lineTo(newX, newY);
+                    ctx.strokeStyle = turtle.color;
+                    ctx.lineWidth = turtle.width;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+
+                turtle.x = newX;
+                turtle.y = newY;
+                resolve();
+            });
+        }
+
+        window.onload = resize;
+        window.onresize = resize;
+    </script>
+</body>
+</html>
