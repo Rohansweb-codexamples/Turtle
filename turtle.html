@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turtle Scratch - Multi-Sprite & Backdrops</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f0fdf4;
+            overflow: hidden;
+        }
+
+        .scratch-font {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        .block {
+            cursor: grab;
+            user-select: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.1);
+            width: fit-content;
+            min-width: 120px;
+        }
+
+        .block:active {
+            cursor: grabbing;
+            transform: scale(1.02);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .nested-container {
+            min-height: 30px;
+            margin-left: 20px;
+            border-left: 4px solid rgba(0,0,0,0.2);
+            padding: 4px 0 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 0 0 0 8px;
+        }
+
+        .workspace-block {
+            position: relative;
+            margin-bottom: 4px;
+        }
+
+        .turtle-canvas {
+            background-size: 40px 40px;
+            transition: background 0.5s ease;
+        }
+
+        .bg-grid {
+            background-image: 
+                linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+        }
+        .bg-grass { background-color: #86efac; background-image: radial-gradient(#4ade80 1px, transparent 1px); background-size: 20px 20px; }
+        .bg-ocean { background-color: #7dd3fc; background-image: url('https://www.transparenttextures.com/patterns/water.png'); }
+        .bg-space { background-color: #0f172a; background-image: radial-gradient(white 1px, transparent 1px); background-size: 50px 50px; }
+        .bg-night { background-color: #1e1b4b; }
+
+        .droppable-area {
+            min-height: 100px;
+        }
+
+        .drag-over {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+            outline: 2px dashed #3b82f6;
+        }
+
+        .sprite-element {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-4xl;
+            cursor: pointer;
+            transition: transform 0.15s linear, opacity 0.3s;
+            z-index: 20;
+        }
+
+        .sprite-element.selected {
+            outline: 2px dashed #fbbf24;
+            outline-offset: 4px;
+            border-radius: 50%;
+            background: rgba(251, 191, 36, 0.1);
+        }
+
+        .speech-bubble {
+            position: absolute;
+            background: white;
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 4px 10px;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            pointer-events: none;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-5px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            25% { transform: translate(-5px, 5px); }
+            50% { transform: translate(5px, -5px); }
+            75% { transform: translate(-5px, -5px); }
+        }
+        .animate-shake-screen { animation: shake 0.2s infinite; }
+
+        #modal-overlay, #code-modal {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-green-600 text-white p-4 flex justify-between items-center shadow-lg z-30">
+        <div class="flex items-center gap-3">
+            <span class="text-3xl">🐢</span>
+            <div>
+                <h1 class="text-2xl scratch-font tracking-wider leading-none">TURTLE SCRATCH</h1>
+                <p class="text-[10px] opacity-75 font-mono mt-1">rohansweb-codexamples.github.io/Turtle/</p>
+            </div>
+        </div>
+        <div class="flex gap-4">
+            <button onclick="shareProject()" class="bg-blue-500 hover:bg-blue-400 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-md transition-all active:scale-95">
+                <span>🔗</span> SHARE
+            </button>
+            <button id="run-btn" onclick="runCode()" class="bg-yellow-400 hover:bg-yellow-300 text-green-900 px-8 py-2 rounded-full font-bold flex items-center gap-2 shadow-md transition-all active:scale-95">
+                <span>▶</span> RUN
+            </button>
+            <button onclick="resetCanvas()" class="bg-red-500 hover:bg-red-400 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-md transition-all active:scale-95">
+                <span>↺</span> RESET
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Palette (Left) -->
+        <aside class="w-80 bg-white border-r border-green-200 overflow-y-auto p-4 flex flex-col gap-2 z-20">
+            <h2 class="font-bold text-green-800 text-sm uppercase tracking-widest mb-4">Block Palette</h2>
+            
+            <div id="palette" class="space-y-6">
+                <!-- Motion -->
+                <div>
+                    <p class="text-[10px] font-bold text-blue-500 mb-2 border-b border-blue-100 pb-1">MOTION</p>
+                    <div class="block bg-blue-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="forward">
+                        Move <input type="number" value="50" class="w-10 text-black px-1 rounded mx-1 text-center"> steps
+                    </div>
+                    <div class="block bg-blue-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="backward">
+                        Back <input type="number" value="50" class="w-10 text-black px-1 rounded mx-1 text-center"> steps
+                    </div>
+                    <div class="block bg-blue-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="right">
+                        Turn ↻ <input type="number" value="90" class="w-10 text-black px-1 rounded mx-1 text-center"> deg
+                    </div>
+                    <div class="block bg-blue-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="left">
+                        Turn ↺ <input type="number" value="90" class="w-10 text-black px-1 rounded mx-1 text-center"> deg
+                    </div>
+                    <div class="block bg-blue-400 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="random_pos">
+                        Jump to Random
+                    </div>
+                    <div class="block bg-blue-600 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="point_mouse">
+                        Point to Mouse 🖱️
+                    </div>
+                </div>
+
+                <!-- Pen -->
+                <div>
+                    <p class="text-[10px] font-bold text-teal-600 mb-2 border-b border-teal-100 pb-1">PEN</p>
+                    <div class="block bg-teal-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="pendown">
+                        Pen Down
+                    </div>
+                    <div class="block bg-teal-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="penup">
+                        Pen Up
+                    </div>
+                    <div class="block bg-teal-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="color">
+                        Set Color <input type="color" value="#10b981" class="w-6 h-5 rounded cursor-pointer ml-1">
+                    </div>
+                    <div class="block bg-teal-600 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="rainbow">
+                        Rainbow Pen 🌈
+                    </div>
+                    <div class="block bg-teal-600 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="width">
+                        Width <input type="number" value="3" min="1" class="w-10 text-black px-1 rounded mx-1 text-center">
+                    </div>
+                </div>
+
+                <!-- Control -->
+                <div>
+                    <p class="text-[10px] font-bold text-orange-500 mb-2 border-b border-orange-100 pb-1">CONTROL</p>
+                    <div class="block bg-orange-500 text-white p-2 rounded-t-lg text-sm" draggable="true" data-type="repeat">
+                        Repeat <input type="number" value="4" class="w-10 text-black px-1 rounded mx-1 text-center"> times
+                        <div class="nested-container droppable-area" data-is-nested="true"></div>
+                        <div class="text-[10px] opacity-70 mt-1">End Repeat</div>
+                    </div>
+                    <div class="block bg-orange-400 text-white p-2 rounded-lg text-sm mt-2" draggable="true" data-type="wait">
+                        Wait <input type="number" value="0.2" step="0.1" class="w-10 text-black px-1 rounded mx-1 text-center"> s
+                    </div>
+                </div>
+
+                <!-- Looks & Fun -->
+                <div>
+                    <p class="text-[10px] font-bold text-purple-500 mb-2 border-b border-purple-100 pb-1">LOOKS & FUN</p>
+                    <div class="block bg-purple-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="sprite">
+                        Sprite <select class="text-black rounded mx-1 text-xs" onclick="event.stopPropagation()">
+                            <option value="🐢">🐢 Turtle</option>
+                            <option value="🐋">🐋 Whale</option>
+                            <option value="🐣">🐣 Chick</option>
+                            <option value="🐈">🐈 Cat</option>
+                            <option value="🐕">🐕 Dog</option>
+                            <option value="🚀">🚀 Rocket</option>
+                            <option value="🤖">🤖 Robot</option>
+                            <option value="🎨">🎨 Palette</option>
+                        </select>
+                    </div>
+                    <div class="block bg-purple-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="say">
+                        Say <input type="text" value="Hello!" class="w-20 text-black px-1 rounded mx-1 text-center">
+                    </div>
+                    <div class="block bg-purple-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="size">
+                        Set Size <input type="number" value="100" class="w-10 text-black px-1 rounded mx-1 text-center">%
+                    </div>
+                    <div class="block bg-purple-400 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="stamp">
+                        Stamp Current
+                    </div>
+                </div>
+
+                <!-- Backdrop & Stage -->
+                <div>
+                    <p class="text-[10px] font-bold text-gray-500 mb-2 border-b border-gray-100 pb-1">STAGE & BACKDROP</p>
+                    <div class="block bg-gray-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="backdrop">
+                        Backdrop <select class="text-black rounded mx-1 text-xs" onclick="event.stopPropagation()">
+                            <option value="grid">Grid</option>
+                            <option value="grass">Grass</option>
+                            <option value="ocean">Ocean</option>
+                            <option value="space">Space</option>
+                            <option value="night">Night</option>
+                        </select>
+                    </div>
+                    <div class="block bg-indigo-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="add_sprite">
+                        Create New Sprite ➕
+                    </div>
+                </div>
+
+                <!-- Special -->
+                <div>
+                    <p class="text-[10px] font-bold text-red-500 mb-2 border-b border-red-100 pb-1">SPECIAL</p>
+                    <div class="block bg-red-500 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="clear">
+                        Clear Canvas
+                    </div>
+                    <div class="block bg-red-600 text-white p-2 rounded-lg text-sm mb-2" draggable="true" data-type="flash_stage">
+                        Flash Stage ⚡
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Workspace (Center) -->
+        <section class="flex-1 bg-slate-100 p-6 overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-slate-400 text-sm uppercase tracking-widest">Workspace</h2>
+                <button onclick="clearWorkspace()" class="text-xs text-slate-400 hover:text-red-500 underline">Clear All</button>
+            </div>
+            <div id="workspace" class="droppable-area bg-white rounded-2xl border-2 border-dashed border-slate-300 p-6 min-h-[calc(100vh-200px)] shadow-inner">
+                <!-- Dropped blocks go here -->
+            </div>
+        </section>
+
+        <!-- Stage (Right) -->
+        <section class="w-[520px] bg-white border-l border-green-200 p-6 flex flex-col items-center">
+            <div class="flex justify-between w-full mb-4">
+                <h2 class="font-bold text-green-800 text-sm uppercase tracking-widest">Stage</h2>
+                <div class="flex items-center gap-4">
+                    <button onclick="viewProjectCode()" class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                        <span>📄</span> VIEW CODE
+                    </button>
+                    <div class="bg-slate-100 px-2 py-1 rounded text-[10px] text-slate-500 font-mono" id="coords">X: 0, Y: 0</div>
+                </div>
+            </div>
+            
+            <div class="relative w-full aspect-square bg-white border-4 border-slate-800 rounded shadow-2xl overflow-hidden turtle-canvas bg-grid" id="canvas-container">
+                <canvas id="turtle-canvas" class="absolute inset-0"></canvas>
+                <div id="sprite-layer" class="absolute inset-0 z-20 pointer-events-none">
+                    <!-- Sprites will be injected here -->
+                </div>
+            </div>
+
+            <div class="mt-6 w-full p-4 bg-slate-50 rounded-xl border border-slate-100">
+               <div class="flex items-center gap-3 text-xs text-slate-500">
+                   <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">💡</div>
+                   <p>Click a sprite on the stage to select it! Use the <b>Share</b> button to save your project at <b>rohansweb-codexamples.github.io/Turtle/</b></p>
+               </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Share Modal -->
+    <div id="modal-overlay" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl transform transition-all">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl">🔗</span>
+                <h3 class="text-2xl scratch-font text-blue-600">Project Shared!</h3>
+            </div>
+            <p class="text-gray-600 mb-6 text-sm">Your creation is now live! Anyone with this link can view and run your code at your personal GitHub address.</p>
+            <div class="bg-slate-100 p-4 rounded-lg flex items-center gap-2 mb-6 border border-slate-200">
+                <input id="share-link" type="text" readonly class="bg-transparent flex-1 text-xs font-mono outline-none text-slate-700">
+                <button onclick="copyShareLink()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded-md text-xs font-bold transition-colors">Copy</button>
+            </div>
+            <button onclick="closeModal()" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl font-bold transition-colors">Done</button>
+        </div>
+    </div>
+
+    <!-- Code View Modal -->
+    <div id="code-modal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-800">Project JSON Structure</h3>
+                <button onclick="closeCodeModal()" class="text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
+            </div>
+            <div class="bg-slate-900 text-green-400 p-4 rounded-xl overflow-auto font-mono text-sm flex-1 mb-6 border-2 border-slate-800">
+                <pre id="code-display"></pre>
+            </div>
+            <button onclick="closeCodeModal()" class="bg-slate-800 text-white py-2 rounded-lg font-bold">Close Viewer</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('turtle-canvas');
+        const ctx = canvas.getContext('2d');
+        const workspace = document.getElementById('workspace');
+        const container = document.getElementById('canvas-container');
+        const spriteLayer = document.getElementById('sprite-layer');
+        const runBtn = document.getElementById('run-btn');
+
+        // Fixed Base URL for sharing
+        const BASE_URL = "https://rohansweb-codexamples.github.io/Turtle/";
+
+        // State
+        let sprites = [];
+        let selectedSpriteIndex = 0;
+        let isRunning = false;
+        let draggedElement = null;
+        let mousePos = { x: 0, y: 0 };
+        let stageClicked = false;
+
+        function createSprite(emoji = '🐢') {
+            const id = Date.now() + Math.random();
+            const spriteObj = {
+                id: id,
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                angle: -90,
+                penDown: true,
+                color: '#10b981',
+                width: 3,
+                rainbow: false,
+                hue: Math.random() * 360,
+                size: 40,
+                ghost: 0,
+                emoji: emoji,
+                penOpacity: 1,
+                speech: ''
+            };
+            sprites.push(spriteObj);
+            renderSprites();
+            return spriteObj;
+        }
+
+        function renderSprites() {
+            spriteLayer.innerHTML = '';
+            sprites.forEach((s, index) => {
+                const el = document.createElement('div');
+                el.className = `sprite-element ${index === selectedSpriteIndex ? 'selected' : ''}`;
+                el.style.pointerEvents = 'auto';
+                el.innerHTML = `
+                    <span style="font-size: ${s.size}px; opacity: ${(100-s.ghost)/100}; display: block;">${s.emoji}</span>
+                    <div class="speech-bubble ${s.speech ? '' : 'hidden'}">${s.speech}</div>
+                `;
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    selectedSpriteIndex = index;
+                    renderSprites();
+                };
+                spriteLayer.appendChild(el);
+                el.style.transform = `translate(${s.x - 32}px, ${s.y - 32}px) rotate(${s.angle + 90}deg)`;
+            });
+            const sel = sprites[selectedSpriteIndex];
+            if(sel) {
+                document.getElementById('coords').innerText = `X: ${Math.round(sel.x - canvas.width/2)}, Y: ${Math.round(canvas.height/2 - sel.y)}`;
+            }
+        }
+
+        container.addEventListener('mousemove', (e) => {
+            const rect = container.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        container.addEventListener('mousedown', () => { stageClicked = true; });
+
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            resetCanvas();
+        }
+
+        function resetCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            sprites = [];
+            selectedSpriteIndex = 0;
+            createSprite('🐢');
+            container.className = "relative w-full aspect-square bg-white border-4 border-slate-800 rounded shadow-2xl overflow-hidden turtle-canvas bg-grid";
+            renderSprites();
+        }
+
+        function clearWorkspace() {
+            if(confirm("Empty the workspace?")) workspace.innerHTML = '';
+        }
+
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('block')) {
+                draggedElement = e.target;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => e.target.style.opacity = "0.5", 0);
+            }
+        });
+
+        document.addEventListener('dragend', (e) => {
+            if (draggedElement) draggedElement.style.opacity = "1";
+            draggedElement = null;
+            document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        });
+
+        document.addEventListener('dragover', (e) => {
+            const dropTarget = e.target.closest('.droppable-area');
+            if (dropTarget) {
+                e.preventDefault();
+                dropTarget.classList.add('drag-over');
+            }
+        });
+
+        document.addEventListener('drop', (e) => {
+            const dropTarget = e.target.closest('.droppable-area');
+            if (dropTarget && draggedElement) {
+                e.preventDefault();
+                dropTarget.classList.remove('drag-over');
+
+                const isPalette = draggedElement.closest('#palette');
+                let newBlock;
+
+                if (isPalette) {
+                    newBlock = draggedElement.cloneNode(true);
+                    newBlock.style.opacity = "1";
+                    newBlock.classList.add('workspace-block');
+                    const del = document.createElement('button');
+                    del.innerHTML = '×';
+                    del.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm';
+                    newBlock.classList.add('group');
+                    del.onclick = (ev) => { ev.stopPropagation(); newBlock.remove(); };
+                    newBlock.appendChild(del);
+                } else {
+                    newBlock = draggedElement;
+                }
+                dropTarget.appendChild(newBlock);
+            }
+        });
+
+        async function runCode() {
+            if (isRunning) return;
+            isRunning = true;
+            runBtn.disabled = true;
+            runBtn.innerText = "RUNNING...";
+            
+            sprites.forEach(s => {
+                s.x = canvas.width/2;
+                s.y = canvas.height/2;
+                s.angle = -90;
+                s.speech = '';
+            });
+
+            await executeContainer(workspace);
+
+            isRunning = false;
+            runBtn.disabled = false;
+            runBtn.innerText = "▶ RUN";
+            renderSprites();
+        }
+
+        async function executeContainer(container) {
+            const blocks = Array.from(container.children).filter(el => el.classList.contains('block'));
+            for (let block of blocks) {
+                if (!isRunning) break;
+                await executeBlock(block);
+            }
+        }
+
+        async function executeBlock(block) {
+            const type = block.dataset.type;
+            const inputs = block.querySelectorAll(':scope > input, :scope > select');
+            const turtle = sprites[selectedSpriteIndex];
+            if(!turtle) return;
+
+            block.classList.add('ring-2', 'ring-yellow-400', 'z-10');
+            
+            switch (type) {
+                case 'forward': await moveDistance(turtle, parseFloat(inputs[0].value)); break;
+                case 'backward': await moveDistance(turtle, -parseFloat(inputs[0].value)); break;
+                case 'right': turtle.angle += parseFloat(inputs[0].value); break;
+                case 'left': turtle.angle -= parseFloat(inputs[0].value); break;
+                case 'random_pos':
+                    turtle.x = Math.random() * canvas.width;
+                    turtle.y = Math.random() * canvas.height;
+                    break;
+                case 'point_mouse':
+                    const dx = mousePos.x - turtle.x;
+                    const dy = mousePos.y - turtle.y;
+                    turtle.angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    break;
+                case 'pendown': turtle.penDown = true; break;
+                case 'penup': turtle.penDown = false; break;
+                case 'color': 
+                    turtle.color = inputs[0].value; 
+                    turtle.rainbow = false;
+                    break;
+                case 'rainbow': turtle.rainbow = true; break;
+                case 'width': turtle.width = parseFloat(inputs[0].value); break;
+                case 'sprite': turtle.emoji = inputs[0].value; break;
+                case 'say':
+                    turtle.speech = inputs[0].value;
+                    renderSprites();
+                    break;
+                case 'size': turtle.size = (parseFloat(inputs[0].value) / 100) * 40; break;
+                case 'clear': ctx.clearRect(0,0, canvas.width, canvas.height); break;
+                case 'flash_stage':
+                    container.classList.add('animate-shake-screen');
+                    await new Promise(r => setTimeout(r, 200));
+                    container.classList.remove('animate-shake-screen');
+                    break;
+                case 'stamp':
+                    ctx.save();
+                    ctx.translate(turtle.x, turtle.y);
+                    ctx.rotate((turtle.angle + 90) * Math.PI / 180);
+                    ctx.font = `${turtle.size}px serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.globalAlpha = (100 - turtle.ghost) / 100;
+                    ctx.fillText(turtle.emoji, 0, 0);
+                    ctx.restore();
+                    break;
+                case 'backdrop':
+                    container.className = `relative w-full aspect-square border-4 border-slate-800 rounded shadow-2xl overflow-hidden turtle-canvas bg-${inputs[0].value}`;
+                    break;
+                case 'add_sprite':
+                    createSprite('🐥');
+                    selectedSpriteIndex = sprites.length - 1;
+                    break;
+                case 'wait':
+                    await new Promise(r => setTimeout(r, parseFloat(inputs[0].value) * 1000));
+                    break;
+                case 'repeat':
+                    const count = parseInt(inputs[0].value);
+                    const nested = block.querySelector('.nested-container');
+                    for(let i = 0; i < count; i++) {
+                        if(!isRunning) break;
+                        await executeContainer(nested);
+                    }
+                    break;
+            }
+
+            renderSprites();
+            await new Promise(r => setTimeout(r, 20));
+            block.classList.remove('ring-2', 'ring-yellow-400', 'z-10');
+        }
+
+        function moveDistance(turtle, distance) {
+            return new Promise(resolve => {
+                const rad = (turtle.angle * Math.PI) / 180;
+                const newX = turtle.x + Math.cos(rad) * distance;
+                const newY = turtle.y + Math.sin(rad) * distance;
+
+                if (turtle.penDown) {
+                    ctx.beginPath();
+                    ctx.moveTo(turtle.x, turtle.y);
+                    ctx.lineTo(newX, newY);
+                    if (turtle.rainbow) {
+                        turtle.hue = (turtle.hue + 5) % 360;
+                        ctx.strokeStyle = `hsl(${turtle.hue}, 80%, 50%)`;
+                    } else {
+                        ctx.strokeStyle = turtle.color;
+                    }
+                    ctx.lineWidth = turtle.width;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+                }
+                turtle.x = newX;
+                turtle.y = newY;
+                resolve();
+            });
+        }
+
+        function shareProject() {
+            const data = serializeWorkspace();
+            const jsonStr = JSON.stringify(data);
+            const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+            
+            // Hardcoded GitHub Pages path per user request
+            const url = BASE_URL + '#' + encoded;
+            
+            document.getElementById('share-link').value = url;
+            document.getElementById('modal-overlay').classList.remove('hidden');
+        }
+
+        function viewProjectCode() {
+            const data = serializeWorkspace();
+            document.getElementById('code-display').textContent = JSON.stringify(data, null, 2);
+            document.getElementById('code-modal').classList.remove('hidden');
+        }
+
+        function serializeWorkspace() {
+            const blocks = Array.from(workspace.children).filter(el => el.classList.contains('block'));
+            return blocks.map(serializeBlock);
+        }
+
+        function serializeBlock(block) {
+            const inputs = Array.from(block.querySelectorAll(':scope > input, :scope > select')).map(i => i.value);
+            const nested = block.querySelector('.nested-container');
+            return {
+                type: block.dataset.type,
+                inputs: inputs,
+                children: nested ? Array.from(nested.children).filter(el => el.classList.contains('block')).map(serializeBlock) : []
+            };
+        }
+
+        function loadFromHash() {
+            const hash = window.location.hash.substring(1);
+            if(!hash) return;
+            try {
+                const decoded = decodeURIComponent(escape(atob(hash)));
+                const data = JSON.parse(decoded);
+                workspace.innerHTML = '';
+                data.forEach(bData => {
+                    const block = createBlockFromData(bData);
+                    if(block) workspace.appendChild(block);
+                });
+            } catch(e) { console.error("Project load failed.", e); }
+        }
+
+        function createBlockFromData(data) {
+            const paletteBlock = document.querySelector(`#palette [data-type="${data.type}"]`);
+            if(!paletteBlock) return null;
+            const newBlock = paletteBlock.cloneNode(true);
+            newBlock.classList.add('workspace-block');
+            
+            const inputs = newBlock.querySelectorAll(':scope > input, :scope > select');
+            data.inputs.forEach((val, i) => { if(inputs[i]) inputs[i].value = val; });
+            
+            if(data.children && data.children.length > 0) {
+                const nested = newBlock.querySelector('.nested-container');
+                data.children.forEach(cData => {
+                    const child = createBlockFromData(cData);
+                    if(child) nested.appendChild(child);
+                });
+            }
+
+            const del = document.createElement('button');
+            del.innerHTML = '×';
+            del.className = 'absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm';
+            newBlock.classList.add('group');
+            del.onclick = (ev) => { ev.stopPropagation(); newBlock.remove(); };
+            newBlock.appendChild(del);
+
+            return newBlock;
+        }
+
+        function closeModal() { document.getElementById('modal-overlay').classList.add('hidden'); }
+        function closeCodeModal() { document.getElementById('code-modal').classList.add('hidden'); }
+        
+        function copyShareLink() {
+            const copyText = document.getElementById("share-link");
+            copyText.select();
+            document.execCommand("copy");
+        }
+
+        window.onload = () => {
+            resize();
+            loadFromHash();
+        };
+        window.onresize = resize;
+    </script>
+</body>
+</html>
